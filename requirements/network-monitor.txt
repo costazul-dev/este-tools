@@ -1,4 +1,0 @@
-ping3
-scapy
-speedtest-cli
-pandas
