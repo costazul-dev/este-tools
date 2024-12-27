@@ -1,0 +1,21 @@
+# Environment
+venv/
+env/
+.env
+
+# Cache
+__pycache__/
+*.pyc
+.cache
+
+# IDE
+.vscode/
+.idea/
+
+# System
+.DS_Store
+
+# Project-specific
+logs/
+*.log
+
