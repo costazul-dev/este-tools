@@ -1,4 +1,4 @@
 ping3
 scapy
-speedtest
+speedtest-cli
 pandas

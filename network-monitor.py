@@ -48,14 +48,22 @@ class NetworkMonitor:
         targets = [self.router_ip, "8.8.8.8", "1.1.1.1"]
         results = {}
         
+        # Check if running with proper privileges
+        if os.geteuid() != 0:  # Will be None on Windows
+            self.logger.warning("Script is not running with root privileges. Ping functionality may be limited.")
+            
         for target in targets:
             try:
                 latencies = []
                 for _ in range(count):
-                    response_time = ping(target, timeout=1)
-                    if response_time is not None:
-                        latencies.append(response_time * 1000)  # Convert to ms
-                
+                    try:
+                        response_time = ping(target, timeout=1)
+                        if response_time is not None:
+                            latencies.append(response_time * 1000)  # Convert to ms
+                    except PermissionError:
+                        self.logger.error(f"Permission denied while pinging {target}. Try running with sudo/administrator privileges.")
+                        raise
+                    
                 if latencies:
                     avg_latency = sum(latencies) / len(latencies)
                     packet_loss = (count - len(latencies)) / count * 100
@@ -76,22 +84,31 @@ class NetworkMonitor:
                 }).to_csv(self.ping_file, mode='a', header=False, index=False)
                 
             except Exception as e:
-                self.logger.error(f"Error pinging {target}: {str(e)}")
-                results[target] = {'error': str(e)}
+                error_msg = str(e)
+                if "Permission denied" in error_msg:
+                    error_msg += " (Try running with sudo/administrator privileges)"
+                self.logger.error(f"Error pinging {target}: {error_msg}")
+                results[target] = {'error': error_msg}
         
         return results
 
     def check_speed(self):
         """Run a speed test and log results."""
         try:
-            st = speedtest.Speedtest()
+            import speedtest
+            
             self.logger.info("Running speed test...")
+            st = speedtest.Speedtest()
             
             # Get best server
+            self.logger.info("Finding best server...")
             st.get_best_server()
             
             # Run speed test
+            self.logger.info("Testing download speed...")
             download_speed = st.download() / 1_000_000  # Convert to Mbps
+            
+            self.logger.info("Testing upload speed...")
             upload_speed = st.upload() / 1_000_000  # Convert to Mbps
             
             # Log results
@@ -106,6 +123,10 @@ class NetworkMonitor:
                 'upload_mbps': round(upload_speed, 2)
             }
             
+        except ImportError:
+            error_msg = "Speedtest module not found. Install with: pip install speedtest-cli"
+            self.logger.error(error_msg)
+            return {'error': error_msg}
         except Exception as e:
             self.logger.error(f"Speed test error: {str(e)}")
             return {'error': str(e)}
